@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/target_look.dart';
 import '../../../data/models/block_target.dart';
 
 /// A single feed the user can block. Shows a branded icon so the target is
@@ -23,7 +23,7 @@ class TargetTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final look = _lookFor(target.id, scheme);
+    final look = targetLookFor(target.id, scheme);
 
     return Card(
       child: Padding(
@@ -76,22 +76,4 @@ class TargetTile extends StatelessWidget {
       ),
     );
   }
-
-  _TargetLook _lookFor(String id, ColorScheme scheme) => switch (id) {
-        'youtube_shorts' => const _TargetLook(
-            Icons.smart_display_rounded,
-            AppTheme.youtube,
-          ),
-        'instagram_reels' => const _TargetLook(
-            Icons.slow_motion_video_rounded,
-            AppTheme.instagram,
-          ),
-        _ => _TargetLook(Icons.videocam_rounded, scheme.primary),
-      };
-}
-
-class _TargetLook {
-  const _TargetLook(this.icon, this.color);
-  final IconData icon;
-  final Color color;
 }

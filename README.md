@@ -44,12 +44,28 @@ Kotlin (native)  →  accessibility service, detection, action   [android/app/sr
   - `ShortVideoBlockerService.kt` — the `AccessibilityService` (event plumbing, throttle, Back)
   - `detection/ShortFeedDetector.kt` — pure matching rules, no Android UI dependency
   - `TargetApp.kt` — the registry of supported feeds and their view-id markers
+  - `stats/UsageStatsTracker.kt` — on-device screen-time/block counting (see Stats below)
   - `BlockerPrefs.kt` — one source of truth for settings (native owns SharedPreferences)
   - `KeepAliveService.kt`, `BootReceiver.kt` — survive background freezing and reboot
 
+### Stats (no extra permission)
+
+The Stats tab shows time spent in each app and how many scrolls were blocked. It is
+counted **without any new permission**, from the same accessibility events the blocker
+already receives:
+
+- A session starts when the app becomes active and ends when it leaves the foreground
+  (confirmed by a 2-second poll of the focused window) or after a 15-second idle gap.
+- Totals are stored per day in SharedPreferences and pruned after 30 days.
+- Because Android only hands us events for the two scoped packages, this is deliberately
+  an *estimate* of foreground time, not a forensic measurement. The UI says so.
+
+This is why the accessibility config also sets `flagRetrieveInteractiveWindows` — it is
+only used to read the *package name* of the focused window.
+
 ## UI at a glance
 
-Two tabs, switched from a bottom navigation bar:
+Three tabs, switched from a bottom navigation bar:
 
 **Block** (the controls)
 - **Status hero** — one of `Not set up yet`, `Paused`, `Nothing selected`, or `Protecting`,
@@ -59,6 +75,11 @@ Two tabs, switched from a bottom navigation bar:
 - **Master switch** and **Blocked feeds** — per-target switches with brand icons, dimmed
   until the engine can actually run.
 - A short privacy footer.
+
+**Stats** (what it counted)
+- Today's total time in YouTube + Instagram and how many scrolls were blocked.
+- Per-app breakdown (time, opens, blocked).
+- A simple seven-day bar chart. All on-device.
 
 **How it works** (the explanation)
 - Why the accessibility layer is needed, the three-step explanation, what TollGate *can't*
@@ -155,8 +176,9 @@ debug builds behave differently for background services.
 - [x] Accessibility permission onboarding that reflects the *real* OS state
 - [x] Silent auto-back blocking with event throttling
 - [x] Settings persisted and re-armed after reboot
-- [ ] Phase 2 candidates: block counters/stats, "blocked" overlay with a breathing pause,
-      scheduled windows, TikTok/Facebook, quick-settings tile, battery-optimisation nudge
+- [x] On-device stats: time in app, opens, and scrolls blocked (no extra permission)
+- [ ] Phase 2 candidates: "blocked" overlay with a breathing pause, scheduled windows,
+      TikTok/Facebook, quick-settings tile, battery-optimisation nudge
 
 ## Known limitations
 

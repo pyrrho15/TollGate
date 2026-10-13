@@ -5,6 +5,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import com.tollgate.app.blocker.stats.UsageStatsTracker
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
@@ -30,6 +31,8 @@ class BlockerController(private val context: Context) {
     fun handle(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "getState" -> result.success(currentState())
+
+            "getStats" -> result.success(UsageStatsTracker.snapshot(context))
 
             "setMasterEnabled" -> {
                 val enabled = call.arguments as? Boolean ?: false

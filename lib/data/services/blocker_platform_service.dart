@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 
+import '../models/app_stats.dart';
 import '../models/blocker_state.dart';
 
 /// Thin wrapper over the platform channels. This is the only place in the Dart code
@@ -36,6 +37,12 @@ class BlockerPlatformService {
 
   Future<void> openNotificationSettings() =>
       _methods.invokeMethod<void>('openNotificationSettings');
+
+  /// On-device usage/blocking stats. Never leaves the phone.
+  Future<AppStats> getStats() async {
+    final map = await _methods.invokeMethod<Map<dynamic, dynamic>>('getStats');
+    return AppStats.fromMap(map!);
+  }
 
   /// Pushed by native whenever the permission or settings change.
   Stream<BlockerState> get stateStream => _events
