@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TollGate</string>
+
+    <string name="accessibility_service_label">TollGate Short Block</string>
+    <string name="accessibility_service_summary">Blocks Shorts and Reels automatically</string>
+    <string name="accessibility_service_description">TollGate uses this service to notice when you open Shorts or Reels and take you back automatically. It only reads the screen layout of the apps you enable, never your messages, and the app has no internet access.</string>
+
+    <string name="blocked_toast">%1$s blocked</string>
+
+    <string name="status_channel_name">TollGate status</string>
+    <string name="status_title">TollGate is active</string>
+    <string name="status_text">Reels and Shorts blocking is on</string>
+</resources>

@@ -47,6 +47,38 @@ Kotlin (native)  →  accessibility service, detection, action   [android/app/sr
   - `BlockerPrefs.kt` — one source of truth for settings (native owns SharedPreferences)
   - `KeepAliveService.kt`, `BootReceiver.kt` — survive background freezing and reboot
 
+## UI at a glance
+
+Two tabs, switched from a bottom navigation bar:
+
+**Block** (the controls)
+- **Status hero** — one of `Not set up yet`, `Paused`, `Nothing selected`, or `Protecting`,
+  always reflecting the real OS + settings state.
+- **Setup card** (only until permission is granted) — numbered steps, including the
+  Android 13+ "Allow restricted settings" gotcha, and a button that opens the OS screen.
+- **Master switch** and **Blocked feeds** — per-target switches with brand icons, dimmed
+  until the engine can actually run.
+- A short privacy footer.
+
+**How it works** (the explanation)
+- Why the accessibility layer is needed, the three-step explanation, what TollGate *can't*
+  see, the privacy guarantee, and an About card with the app version.
+
+Styling lives in `lib/core/theme/app_theme.dart`; reusable widgets in
+`lib/core/widgets/`; each feature owns its own `features/<name>/` folder with a screen and
+its `widgets/`. Widgets read styling through `Theme.of(context)`. The launcher icon is an
+adaptive icon (a shield with a "back" arrow): see
+`android/app/src/main/res/mipmap-anydpi-v26/` and the `ic_launcher_*` drawables.
+
+### Running the UI tests
+
+The widget tests render every screen state into a narrow phone viewport and fail on any
+layout overflow, so they run without a device:
+
+```bash
+flutter test
+```
+
 ## Testing on your phone
 
 > **Toolchain already installed on this machine** (no sudo needed):
@@ -132,4 +164,3 @@ Resource ids are internal to the target apps and **rotate between releases**. De
 is best-effort: if a target app ships a redesign, the marker lists in `TargetApp.kt`
 need updating. This is inherent to the approach — any app claiming otherwise is
 overselling.
-# TollGate

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon foreground: a shield with a cut-out "back" arrow, matching what
+  the app does (sends you back when a Short or Reel opens).
+
+  The arrow is drawn as a second sub-path; `fillType="evenOdd"` turns the
+  overlap into a hole so the background gradient shows through.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M54,26 L77,34 C77,54 69,68 54,80 C39,68 31,54 31,34 Z M66,50 L43,50 L43,46 L36,54 L43,62 L43,58 L66,58 Z" />
+</vector>
