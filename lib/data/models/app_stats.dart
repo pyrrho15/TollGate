@@ -1,3 +1,5 @@
+import 'unblock_info.dart';
+
 /// Screen-time and blocking statistics, built by the native side and read by the
 /// Stats screen. All values are on-device only.
 class AppStats {
@@ -5,6 +7,9 @@ class AppStats {
     required this.today,
     required this.targets,
     required this.history,
+    this.calendar = const [],
+    this.trackedFrom,
+    this.unblock = UnblockInfo.empty,
   });
 
   /// Local date these "today" figures belong to (yyyy-MM-dd).
@@ -14,6 +19,15 @@ class AppStats {
 
   /// Last seven days, oldest first (includes today).
   final List<DayStat> history;
+
+  /// ~17 weeks of daily totals, oldest first (includes today), for the heatmap.
+  final List<DayStat> calendar;
+
+  /// Earliest day with any recorded data; days before it are left neutral.
+  final String? trackedFrom;
+
+  /// Today's break budget, so the Stats screen can show breaks taken.
+  final UnblockInfo unblock;
 
   int get todayTimeMs => targets.fold(0, (sum, t) => sum + t.timeMs);
   int get todayBlocks => targets.fold(0, (sum, t) => sum + t.blocks);
@@ -27,6 +41,13 @@ class AppStats {
         history: (map['history'] as List)
             .map((e) => DayStat.fromMap(e as Map))
             .toList(growable: false),
+        calendar: ((map['calendar'] as List?) ?? const [])
+            .map((e) => DayStat.fromMap(e as Map))
+            .toList(growable: false),
+        trackedFrom: map['trackedFrom'] as String?,
+        unblock: map['unblock'] == null
+            ? UnblockInfo.empty
+            : UnblockInfo.fromMap(map['unblock'] as Map),
       );
 }
 

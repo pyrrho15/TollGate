@@ -11,4 +11,8 @@
     <string name="status_channel_name">TollGate status</string>
     <string name="status_title">TollGate is active</string>
     <string name="status_text">Reels and Shorts blocking is on</string>
+
+    <string name="unblock_title">Unblocked · %1$d min left today</string>
+    <string name="unblock_text">You said you\u2019d regret this later. Tap Block now to stop.</string>
+    <string name="unblock_action_reblock">Block now</string>
 </resources>

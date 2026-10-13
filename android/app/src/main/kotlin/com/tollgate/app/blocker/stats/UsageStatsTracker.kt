@@ -26,7 +26,10 @@ object UsageStatsTracker {
 
     private const val FILE = "tollgate_stats"
     private const val PREFIX = "v1"
-    private const val RETAIN_DAYS = 30
+    private const val RETAIN_DAYS = 400
+
+    /** How many days the contribution graph asks for (17 weeks). */
+    private const val CALENDAR_DAYS = 119
 
     /** How long a session survives without any signal that the app is still active. */
     private const val IDLE_TIMEOUT_MS = 15_000L
@@ -178,30 +181,46 @@ object UsageStatsTracker {
             )
         }
 
-        val history = (6 downTo 0).map { offset ->
-            val date = Calendar.getInstance().apply {
-                add(Calendar.DAY_OF_YEAR, -offset)
-            }.let { dayFormat.format(it.time) }
-
+        fun dayTotal(date: String, extraLiveMs: Long): Map<String, Any?> {
             var timeMs = 0L
             var blocks = 0L
             for (target in SupportedTargets.all) {
                 timeMs += prefs.getLong(key(date, target.id, METRIC_TIME), 0L)
                 blocks += prefs.getLong(key(date, target.id, METRIC_BLOCKS), 0L)
             }
-            if (date == today) {
-                // include the live session in today's bar
-                for (target in SupportedTargets.all) {
-                    if (target.id == liveTargetId) timeMs += liveMs
-                }
-            }
-            mapOf("date" to date, "timeMs" to timeMs, "blocks" to blocks)
+            return mapOf("date" to date, "timeMs" to timeMs + extraLiveMs, "blocks" to blocks)
+        }
+
+        fun dateAt(offset: Int): String =
+            Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, -offset)
+            }.let { dayFormat.format(it.time) }
+
+        val history = (6 downTo 0).map { offset ->
+            val date = dateAt(offset)
+            dayTotal(date, if (date == today) liveMs else 0L)
+        }
+
+        val calendar = (CALENDAR_DAYS downTo 0).map { offset ->
+            val date = dateAt(offset)
+            dayTotal(date, if (date == today) liveMs else 0L)
+        }
+
+        // The first day we ever recorded anything, so the graph can leave the days
+        // before TollGate existed neutral instead of falsely "green".
+        var trackedFrom = today
+        for (stored in prefs.all.keys) {
+            val parts = stored.split('|')
+            if (parts.size < 4 || parts[0] != PREFIX) continue
+            if (parts[1] < trackedFrom) trackedFrom = parts[1]
         }
 
         return mapOf(
             "today" to today,
             "targets" to targets,
             "history" to history,
+            "calendar" to calendar,
+            "trackedFrom" to trackedFrom,
         )
     }
 }

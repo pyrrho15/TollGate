@@ -4,7 +4,10 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/privacy_note.dart';
 import '../../core/widgets/section_header.dart';
+import '../../data/models/block_target.dart';
 import 'home_controller.dart';
+import 'widgets/break_card.dart';
+import 'widgets/commitment_dialog.dart';
 import 'widgets/permission_card.dart';
 import 'widgets/status_banner.dart';
 import 'widgets/target_tile.dart';
@@ -78,8 +81,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const SizedBox(height: AppTheme.gutter),
           PermissionCard(onOpenSettings: controller.openAccessibilitySettings),
         ],
-        const SizedBox(height: AppTheme.gutter),
-        _MasterSwitch(controller: controller),
+        if (hasPermission) ...[
+          const SizedBox(height: AppTheme.gutter),
+          BreakCard(
+            state: state,
+            onEnableProtection: controller.enableProtection,
+            onStartBreak: () => _startBreak(context, controller),
+            onStopBreak: controller.reblockNow,
+          ),
+        ],
         const SizedBox(height: 28),
         const SectionHeader(
           title: 'Blocked feeds',
@@ -90,10 +100,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             padding: const EdgeInsets.only(bottom: 8),
             child: TargetTile(
               target: target,
-              // Per-target switches only make sense once the engine can run.
+              // Feeds can only be changed once the engine can actually run.
               enabled: hasPermission && state.masterEnabled,
-              onChanged: (value) =>
-                  controller.setTargetEnabled(target.id, value),
+              onChanged: (value) => _toggleTarget(context, controller, target, value),
             ),
           ),
         ),
@@ -101,6 +110,47 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         const PrivacyNote(),
       ],
     );
+  }
+
+  /// Turning a feed off is a commitment decision; turning it on is free.
+  Future<void> _toggleTarget(
+    BuildContext context,
+    HomeController controller,
+    BlockTarget target,
+    bool value,
+  ) async {
+    if (value) {
+      final error = await controller.setTargetEnabled(target.id, true);
+      if (error != null && context.mounted) _snack(context, error);
+      return;
+    }
+
+    await showCommitmentDialog(
+      context,
+      title: 'Stop blocking ${target.name}?',
+      description: 'This turns off blocking for this feed. Type the sentence to confirm.',
+      actionLabel: 'Stop blocking',
+      onSubmit: (phrase) => controller.setTargetEnabled(
+        target.id,
+        false,
+        phrase: phrase,
+      ),
+    );
+  }
+
+  Future<void> _startBreak(BuildContext context, HomeController controller) async {
+    await showCommitmentDialog(
+      context,
+      title: 'Start a break?',
+      description: 'Reels and Shorts will be allowed until you re-block or run out of '
+          "today's break time.",
+      actionLabel: 'Start break',
+      onSubmit: controller.requestUnblock,
+    );
+  }
+
+  void _snack(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -126,56 +176,6 @@ class _ErrorView extends StatelessWidget {
             FilledButton(onPressed: onRetry, child: const Text('Try again')),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _MasterSwitch extends StatelessWidget {
-  const _MasterSwitch({required this.controller});
-
-  final HomeController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final state = controller.state!;
-    final canToggle = state.accessibilityEnabled;
-
-    return Card(
-      child: SwitchListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        secondary: Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: scheme.primary.withValues(alpha: canToggle ? 0.14 : 0.07),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(
-            state.masterEnabled && canToggle
-                ? Icons.shield_rounded
-                : Icons.shield_outlined,
-            color: canToggle ? scheme.primary : scheme.outline,
-          ),
-        ),
-        title: Text(
-          'Block Reels & Shorts',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        subtitle: Text(
-          canToggle
-              ? 'Turns blocking on or off for the feeds you selected below.'
-              : 'Grant the accessibility permission above to enable this.',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: scheme.onSurfaceVariant,
-          ),
-        ),
-        value: state.masterEnabled,
-        onChanged: canToggle ? controller.setMasterEnabled : null,
       ),
     );
   }

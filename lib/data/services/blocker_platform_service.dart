@@ -24,11 +24,33 @@ class BlockerPlatformService {
     return BlockerState.fromMap(map!);
   }
 
-  Future<BlockerState> setTargetEnabled(String id, bool enabled) async {
+  /// Turning a feed off is gated natively by the commitment phrase.
+  Future<BlockerState> setTargetEnabled(
+    String id,
+    bool enabled, {
+    String? phrase,
+  }) async {
     final map = await _methods.invokeMethod<Map<dynamic, dynamic>>(
       'setTargetEnabled',
-      <String, dynamic>{'id': id, 'enabled': enabled},
+      <String, dynamic>{'id': id, 'enabled': enabled, 'phrase': phrase},
     );
+    return BlockerState.fromMap(map!);
+  }
+
+  /// Starts a timed break. Throws [PlatformException] with a code of
+  /// `phrase_mismatch`, `hard_window`, `budget_exhausted` or `unavailable`.
+  Future<BlockerState> requestUnblock(String phrase) async {
+    final map = await _methods.invokeMethod<Map<dynamic, dynamic>>(
+      'requestUnblock',
+      <String, dynamic>{'phrase': phrase},
+    );
+    return BlockerState.fromMap(map!);
+  }
+
+  /// Ends a running break immediately.
+  Future<BlockerState> reblockNow() async {
+    final map =
+        await _methods.invokeMethod<Map<dynamic, dynamic>>('reblockNow');
     return BlockerState.fromMap(map!);
   }
 

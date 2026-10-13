@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/format.dart';
 import '../../core/widgets/section_header.dart';
 import '../../data/models/app_stats.dart';
 import 'stats_controller.dart';
+import 'widgets/contribution_graph.dart';
 import 'widgets/stat_tile.dart';
 import 'widgets/weekly_bars.dart';
 
@@ -88,8 +90,22 @@ class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
           ),
         ),
         const SizedBox(height: 20),
+        _BreaksToday(stats: stats),
+        const SizedBox(height: 20),
         WeeklyBars(history: stats.history),
         const SizedBox(height: 20),
+        SectionHeader(
+          title: 'Consistency',
+          subtitle:
+              'Green means under ${formatDurationCompact(AppConstants.dailyUnblockBudget.inMilliseconds)} '
+              'of YouTube + Instagram that day.',
+        ),
+        ContributionGraph(
+          days: stats.calendar,
+          trackedFrom: stats.trackedFrom,
+          thresholdMs: AppConstants.dailyUnblockBudget.inMilliseconds,
+        ),
+        const SizedBox(height: 24),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -116,6 +132,64 @@ class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _BreaksToday extends StatelessWidget {
+  const _BreaksToday({required this.stats});
+
+  final AppStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final unblock = stats.unblock;
+    final breaks = unblock.sessions;
+    final used = formatDuration(unblock.usedMs);
+    final left = formatDuration(unblock.remainingMs);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: scheme.tertiary.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(Icons.coffee_rounded, color: scheme.tertiary),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    breaks == 0 ? 'No breaks taken today' : '$breaks ${breaks == 1 ? 'break' : 'breaks'} today',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    breaks == 0
+                        ? '$left of break time available'
+                        : '$used used · $left left',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

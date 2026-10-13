@@ -45,8 +45,28 @@ Kotlin (native)  →  accessibility service, detection, action   [android/app/sr
   - `detection/ShortFeedDetector.kt` — pure matching rules, no Android UI dependency
   - `TargetApp.kt` — the registry of supported feeds and their view-id markers
   - `stats/UsageStatsTracker.kt` — on-device screen-time/block counting (see Stats below)
+  - `UnblockSchedule.kt` — the daily break budget and the 12am–10am hard schedule
   - `BlockerPrefs.kt` — one source of truth for settings (native owns SharedPreferences)
-  - `KeepAliveService.kt`, `BootReceiver.kt` — survive background freezing and reboot
+  - `KeepAliveService.kt`, `UnblockActionReceiver.kt` — process keeping + the pinned notice
+  - `BootReceiver.kt` — re-arm after reboot
+
+### Commitment, not a switch
+
+A self-control app is only as strong as the friction around turning it off, so "disable
+the block" is deliberately not a switch:
+
+- **1h30m of break time per day.** Pausing blocking starts a timed break that spends from
+  a fixed daily budget. Once it is gone, blocking is back until midnight.
+- **You must type a sentence.** Every break — and every attempt to stop blocking a
+  specific feed — requires retyping `I'll regret this later` exactly (checked natively,
+  so Dart can't skip it).
+- **12am–10am is a hard schedule.** No Reels or Shorts, and no breaks, in that window.
+- **The reminder is pinned.** While a break runs, an ongoing notification shows the time
+  left; if you clear it, it comes straight back, and it has a "Block now" action.
+
+The master on/off switch is gone on purpose: protection is armed once and can only be
+paused through the budgeted break. (The nuclear option — revoking the accessibility
+permission in Android Settings — always remains, as it must on a phone you own.)
 
 ### Stats (no extra permission)
 
@@ -56,7 +76,9 @@ already receives:
 
 - A session starts when the app becomes active and ends when it leaves the foreground
   (confirmed by a 2-second poll of the focused window) or after a 15-second idle gap.
-- Totals are stored per day in SharedPreferences and pruned after 30 days.
+- Totals are stored per day in SharedPreferences (kept for ~13 months).
+- A GitHub-style **consistency grid** turns a day green when that day's YouTube +
+  Instagram time stayed under the daily budget.
 - Because Android only hands us events for the two scoped packages, this is deliberately
   an *estimate* of foreground time, not a forensic measurement. The UI says so.
 
@@ -68,18 +90,20 @@ only used to read the *package name* of the focused window.
 Three tabs, switched from a bottom navigation bar:
 
 **Block** (the controls)
-- **Status hero** — one of `Not set up yet`, `Paused`, `Nothing selected`, or `Protecting`,
-  always reflecting the real OS + settings state.
+- **Status hero** — one of `Not set up yet`, `Paused`, `On a break`, `Locked until 10am`,
+  `Nothing selected`, or `Protecting`, always reflecting the real OS + settings state.
 - **Setup card** (only until permission is granted) — numbered steps, including the
   Android 13+ "Allow restricted settings" gotcha, and a button that opens the OS screen.
-- **Master switch** and **Blocked feeds** — per-target switches with brand icons, dimmed
-  until the engine can actually run.
+- **Break card** — remaining break time for the day, plus the budgeted "Take a break"
+  button (behind the commitment sentence) or "Block now" while a break is running.
+- **Blocked feeds** — per-target switches with brand icons; turning one **off** needs the
+  sentence and is blocked during the hard schedule.
 - A short privacy footer.
 
 **Stats** (what it counted)
 - Today's total time in YouTube + Instagram and how many scrolls were blocked.
-- Per-app breakdown (time, opens, blocked).
-- A simple seven-day bar chart. All on-device.
+- Per-app breakdown (time, opens, blocked) and a summary of breaks taken today.
+- A seven-day bar chart and a GitHub-style consistency grid. All on-device.
 
 **How it works** (the explanation)
 - Why the accessibility layer is needed, the three-step explanation, what TollGate *can't*
@@ -166,19 +190,23 @@ debug builds behave differently for background services.
 > settings"**, then try again.
 
 1. Open TollGate → **Open accessibility settings** → enable **TollGate Short Block**.
-2. Back in the app, the status should say **Protecting** and the master switch turns on.
+2. Back in the app, the status should say **Protecting**; tap **Turn on protection**.
 3. Open YouTube → swipe into a Short → you should be bounced back. Normal videos still play.
 4. Same for Instagram → Reels tab.
+5. To take a break, tap **Take a break** and type the sentence. The pinned notification
+   appears; it disappears when you re-block or the budget runs out.
 
 ## Phase 1 scope
 
-- [x] Per-target block/unblock toggles (YouTube Shorts, Instagram Reels)
+- [x] Per-target blocking (YouTube Shorts, Instagram Reels) with view-id detection
 - [x] Accessibility permission onboarding that reflects the *real* OS state
 - [x] Silent auto-back blocking with event throttling
 - [x] Settings persisted and re-armed after reboot
 - [x] On-device stats: time in app, opens, and scrolls blocked (no extra permission)
-- [ ] Phase 2 candidates: "blocked" overlay with a breathing pause, scheduled windows,
-      TikTok/Facebook, quick-settings tile, battery-optimisation nudge
+- [x] Commitment layer: daily break budget, typed phrase, hard schedule, pinned notice
+- [x] Consistency grid (GitHub-style) on the Stats tab
+- [ ] Phase 2 candidates: "blocked" overlay with a breathing pause, TikTok/Facebook,
+      quick-settings tile, battery-optimisation nudge, Device-Owner hardening
 
 ## Known limitations
 

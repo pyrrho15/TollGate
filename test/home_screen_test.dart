@@ -7,6 +7,7 @@ import 'package:tollgate/core/constants.dart';
 import 'package:tollgate/data/models/app_stats.dart';
 import 'package:tollgate/data/models/block_target.dart';
 import 'package:tollgate/data/models/blocker_state.dart';
+import 'package:tollgate/data/models/unblock_info.dart';
 import 'package:tollgate/data/services/blocker_platform_service.dart';
 import 'package:tollgate/features/home/home_controller.dart';
 import 'package:tollgate/features/stats/stats_controller.dart';
@@ -28,21 +29,30 @@ class _FakeBlockerService extends BlockerPlatformService {
       accessibilityEnabled: _state.accessibilityEnabled,
       masterEnabled: enabled,
       targets: _state.targets,
+      unblock: _state.unblock,
     );
     return _state;
   }
 
   @override
-  Future<BlockerState> setTargetEnabled(String id, bool enabled) async {
+  Future<BlockerState> setTargetEnabled(String id, bool enabled,
+      {String? phrase}) async {
     _state = BlockerState(
       accessibilityEnabled: _state.accessibilityEnabled,
       masterEnabled: _state.masterEnabled,
       targets: _state.targets
           .map((t) => t.id == id ? t.copyWith(enabled: enabled) : t)
           .toList(growable: false),
+      unblock: _state.unblock,
     );
     return _state;
   }
+
+  @override
+  Future<BlockerState> requestUnblock(String phrase) async => _state;
+
+  @override
+  Future<BlockerState> reblockNow() async => _state;
 
   @override
   Future<void> openAccessibilitySettings() async {}
@@ -116,6 +126,24 @@ final _cases = <String, _Case>{
     ),
     'Nothing selected',
   ),
+  'on a break': _Case(
+    BlockerState(
+      accessibilityEnabled: true,
+      masterEnabled: true,
+      targets: [_youtube(enabled: true), _instagram(enabled: true)],
+      unblock: _breakActive,
+    ),
+    'On a break',
+  ),
+  'hard locked': _Case(
+    BlockerState(
+      accessibilityEnabled: true,
+      masterEnabled: true,
+      targets: [_youtube(enabled: true), _instagram(enabled: true)],
+      unblock: _hardLocked,
+    ),
+    'Locked until 10am',
+  ),
 };
 
 final _baseDay = DateTime(2026, 10, 14);
@@ -126,6 +154,26 @@ String _isoDate(int daysAgo) {
   final day = d.day.toString().padLeft(2, '0');
   return '${d.year}-$m-$day';
 }
+
+const _breakActive = UnblockInfo(
+  budgetMs: 90 * 60 * 1000,
+  usedMs: 48 * 60 * 1000,
+  remainingMs: 42 * 60 * 1000,
+  sessions: 1,
+  active: true,
+  hardWindow: false,
+  activeSince: 0,
+);
+
+const _hardLocked = UnblockInfo(
+  budgetMs: 90 * 60 * 1000,
+  usedMs: 0,
+  remainingMs: 90 * 60 * 1000,
+  sessions: 0,
+  active: false,
+  hardWindow: true,
+  activeSince: 0,
+);
 
 AppStats _sampleStats() => AppStats(
       today: _isoDate(0),
@@ -153,6 +201,16 @@ AppStats _sampleStats() => AppStats(
             blocks: i,
           ),
       ],
+      calendar: [
+        for (var i = 20; i >= 0; i--)
+          DayStat(
+            date: _isoDate(i),
+            timeMs: (i % 4) * 40 * 60 * 1000,
+            blocks: i,
+          ),
+      ],
+      trackedFrom: _isoDate(20),
+      unblock: _breakActive,
     );
 
 Future<void> _pump(WidgetTester tester, BlockerState state) async {
@@ -192,7 +250,7 @@ void main() {
       // Lower items sit below the fold on a small screen; scroll like a user
       // would and make sure everything renders without overflow.
       await tester.scrollUntilVisible(
-        find.text('Block Reels & Shorts'),
+        find.text('Blocked feeds'),
         200,
         scrollable: scrollable,
       );
@@ -209,18 +267,28 @@ void main() {
     });
   }
 
-  testWidgets('toggling the master switch updates the UI', (tester) async {
+  testWidgets('starting a break requires the commitment phrase', (tester) async {
     tester.view.physicalSize = const Size(360, 780);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
     await _pump(tester, _cases['protecting']!.state);
 
-    await tester.tap(find.byType(SwitchListTile));
+    // The break card offers a break, and shows the budget for the day.
+    expect(find.text('Take a break'), findsOneWidget);
+
+    await tester.tap(find.text('Take a break'));
     await tester.pumpAndSettle();
 
+    // The gate shows the exact sentence to retype.
+    expect(find.text(AppConstants.commitmentPhrase), findsOneWidget);
+    expect(find.text('Start break'), findsOneWidget);
+
+    // Submitting closes the dialog (the fake accepts the phrase).
+    await tester.tap(find.text('Start break'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('Paused'), findsOneWidget);
+    expect(find.text('Start break'), findsNothing);
   });
 
   testWidgets('bottom nav opens the how-it-works page', (tester) async {

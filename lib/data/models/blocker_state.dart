@@ -1,4 +1,5 @@
 import 'block_target.dart';
+import 'unblock_info.dart';
 
 /// Snapshot of everything the UI needs to render, as reported by native.
 class BlockerState {
@@ -6,6 +7,7 @@ class BlockerState {
     required this.accessibilityEnabled,
     required this.masterEnabled,
     required this.targets,
+    this.unblock = UnblockInfo.empty,
   });
 
   /// Whether the user has actually granted the Android accessibility permission.
@@ -16,8 +18,14 @@ class BlockerState {
 
   final List<BlockTarget> targets;
 
+  /// Today's break budget / hard-schedule state.
+  final UnblockInfo unblock;
+
   /// Blocking is only truly happening when the permission is granted and the user asked for it.
   bool get isProtecting => accessibilityEnabled && masterEnabled;
+
+  /// Blocking is actively bouncing feeds right now (not on a break).
+  bool get isProtectingNow => isProtecting && !unblock.active;
 
   factory BlockerState.fromMap(Map<dynamic, dynamic> map) => BlockerState(
         accessibilityEnabled: map['accessibilityEnabled'] as bool,
@@ -25,5 +33,8 @@ class BlockerState {
         targets: (map['targets'] as List)
             .map((e) => BlockTarget.fromMap(e as Map))
             .toList(growable: false),
+        unblock: map['unblock'] == null
+            ? UnblockInfo.empty
+            : UnblockInfo.fromMap(map['unblock'] as Map),
       );
 }

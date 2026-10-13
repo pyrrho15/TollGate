@@ -1,6 +1,5 @@
 package com.tollgate.app.blocker
 
-import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
@@ -11,6 +10,9 @@ import io.flutter.plugin.common.MethodChannel
 
 /**
  * Handles method channel calls from Dart and exposes the current blocker state.
+ *
+ * This is also the enforcement point for the commitment rules: disabling a feed or
+ * starting a break is refused here unless the phrase matches and the schedule allows it.
  */
 class BlockerController(private val context: Context) {
 
@@ -26,26 +28,35 @@ class BlockerController(private val context: Context) {
                 "enabled" to BlockerPrefs.isTargetEnabled(context, target.id),
             )
         },
+        "unblock" to UnblockSchedule.snapshot(context),
     )
 
     fun handle(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "getState" -> result.success(currentState())
 
-            "getStats" -> result.success(UsageStatsTracker.snapshot(context))
+            "getStats" -> {
+                val stats = UsageStatsTracker.snapshot(context).toMutableMap()
+                stats["unblock"] = UnblockSchedule.snapshot(context)
+                result.success(stats)
+            }
 
             "setMasterEnabled" -> {
                 val enabled = call.arguments as? Boolean ?: false
                 BlockerPrefs.setMasterEnabled(context, enabled)
                 if (enabled) KeepAliveService.start(context) else KeepAliveService.stop(context)
+                emitState()
                 result.success(currentState())
             }
 
-            "setTargetEnabled" -> {
-                val args = call.arguments as? Map<*, *>
-                val id = args?.get("id") as? String
-                val enabled = args?.get("enabled") as? Boolean ?: false
-                if (id != null) BlockerPrefs.setTargetEnabled(context, id, enabled)
+            "setTargetEnabled" -> setTargetEnabled(call, result)
+
+            "requestUnblock" -> requestUnblock(call, result)
+
+            "reblockNow" -> {
+                UnblockSchedule.stop(context)
+                KeepAliveService.refresh(context)
+                emitState()
                 result.success(currentState())
             }
 
@@ -72,6 +83,66 @@ class BlockerController(private val context: Context) {
             else -> result.notImplemented()
         }
     }
+
+    /**
+     * Turning a feed *on* is free. Turning it *off* is a commitment decision: it needs
+     * the phrase and is refused outright during the hard schedule.
+     */
+    private fun setTargetEnabled(call: MethodCall, result: MethodChannel.Result) {
+        val args = call.arguments as? Map<*, *>
+        val id = args?.get("id") as? String
+        val enabled = args?.get("enabled") as? Boolean ?: true
+        if (id == null) {
+            result.error("bad_request", "Missing target id.", null)
+            return
+        }
+
+        if (!enabled) {
+            if (UnblockSchedule.isHardBlockWindow()) {
+                result.error("hard_window", "Feeds can't be changed between 12am and 10am.", null)
+                return
+            }
+            val phrase = args["phrase"] as? String
+            if (!UnblockSchedule.phrasesMatch(phrase)) {
+                result.error("phrase_mismatch", "That doesn't match the phrase.", null)
+                return
+            }
+        }
+
+        BlockerPrefs.setTargetEnabled(context, id, enabled)
+        emitState()
+        result.success(currentState())
+    }
+
+    private fun requestUnblock(call: MethodCall, result: MethodChannel.Result) {
+        val args = call.arguments as? Map<*, *>
+        val phrase = args?.get("phrase") as? String
+
+        if (!UnblockSchedule.phrasesMatch(phrase)) {
+            result.error("phrase_mismatch", "That doesn't match the phrase.", null)
+            return
+        }
+        if (UnblockSchedule.isHardBlockWindow()) {
+            result.error("hard_window", "Breaks aren't allowed between 12am and 10am.", null)
+            return
+        }
+        if (UnblockSchedule.remainingMs(context) <= 0L) {
+            result.error("budget_exhausted", "Today's break time is used up.", null)
+            return
+        }
+
+        val started = UnblockSchedule.start(context)
+        if (!started) {
+            result.error("unavailable", "Could not start a break right now.", null)
+            return
+        }
+
+        KeepAliveService.refresh(context)
+        emitState()
+        result.success(currentState())
+    }
+
+    private fun emitState() = BlockerEvents.emit(currentState())
 
     companion object {
         /** True only when the OS reports our accessibility service as enabled. */

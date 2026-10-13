@@ -34,7 +34,17 @@ class ShortVideoBlockerService : AccessibilityService() {
 
     private val statsTicker = object : Runnable {
         override fun run() {
-            UsageStatsTracker.onTick(this@ShortVideoBlockerService, activePackageName())
+            val service = this@ShortVideoBlockerService
+            UsageStatsTracker.onTick(service, activePackageName())
+
+            // End a break that the clock or the budget has run out of, and keep the
+            // pinned "you're unblocked" notice alive while one is running.
+            val changed = UnblockSchedule.enforce(service)
+            if (changed || UnblockSchedule.isUnblockActive(service)) {
+                KeepAliveService.refresh(service)
+            }
+            if (changed) BlockerEvents.emit(BlockerController(service).currentState())
+
             handler.postDelayed(this, STATS_TICK_MS)
         }
     }
@@ -58,6 +68,7 @@ class ShortVideoBlockerService : AccessibilityService() {
         if (statsTickerRunning) return
         statsTickerRunning = true
         UsageStatsTracker.prune(this)
+        UnblockSchedule.prune(this)
         ContextCompat.registerReceiver(
             this,
             screenReceiver,
@@ -80,6 +91,9 @@ class ShortVideoBlockerService : AccessibilityService() {
         UsageStatsTracker.onAccessibilityEvent(this, event.packageName?.toString(), eventType)
 
         if (!BlockerPrefs.isMasterEnabled(this)) return
+
+        // A break is running (and allowed): leave the user alone.
+        if (UnblockSchedule.isUnblockActive(this)) return
 
         val packageName = event.packageName?.toString() ?: return
         val target = SupportedTargets.forPackage(packageName) ?: return

@@ -29,8 +29,22 @@ class StatusBanner extends StatelessWidget {
           Icons.pause_circle_rounded,
           scheme.outline,
           'Paused',
-          'Permission granted, but blocking is switched off.',
+          'Permission granted, but protection has not been turned on.',
           'OFF',
+        ),
+      _ when state.unblock.active => (
+          Icons.hourglass_bottom_rounded,
+          scheme.tertiary,
+          'On a break',
+          'Reels and Shorts are allowed. Re-block whenever you are ready.',
+          'BREAK',
+        ),
+      _ when state.unblock.hardWindow => (
+          Icons.lock_clock_rounded,
+          scheme.primary,
+          'Locked until 10am',
+          'No Reels or Shorts — and no breaks — between 12am and 10am.',
+          'LOCKED',
         ),
       _ when !anyTargetOn => (
           Icons.tune_rounded,

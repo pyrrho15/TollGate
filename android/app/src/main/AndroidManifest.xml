@@ -72,6 +72,16 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Re-posts the pinned unblock notice when dismissed, and handles "Block now". -->
+        <receiver
+            android:name=".blocker.UnblockActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.tollgate.app.action.REBLOCK" />
+                <action android:name="com.tollgate.app.action.REPOST_STATUS" />
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
