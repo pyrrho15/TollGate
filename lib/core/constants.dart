@@ -5,7 +5,7 @@ class AppConstants {
   static const String appName = 'TollGate';
 
   /// Shown in the About sheet. Keep in sync with pubspec `version`.
-  static const String appVersion = '1.3.0';
+  static const String appVersion = '1.3.1';
 
   /// One-line description of what the app does.
   static const String tagline = 'Less scrolling. More living.';

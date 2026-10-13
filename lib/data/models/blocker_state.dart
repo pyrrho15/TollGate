@@ -8,6 +8,7 @@ class BlockerState {
     required this.masterEnabled,
     required this.targets,
     this.unblock = UnblockInfo.empty,
+    this.notificationsEnabled = true,
   });
 
   /// Whether the user has actually granted the Android accessibility permission.
@@ -20,6 +21,9 @@ class BlockerState {
 
   /// Today's break budget / hard-schedule state.
   final UnblockInfo unblock;
+
+  /// Whether notifications are allowed; the pinned break reminder needs this.
+  final bool notificationsEnabled;
 
   /// Blocking is only truly happening when the permission is granted and the user asked for it.
   bool get isProtecting => accessibilityEnabled && masterEnabled;
@@ -36,5 +40,6 @@ class BlockerState {
         unblock: map['unblock'] == null
             ? UnblockInfo.empty
             : UnblockInfo.fromMap(map['unblock'] as Map),
+        notificationsEnabled: map['notificationsEnabled'] as bool? ?? true,
       );
 }

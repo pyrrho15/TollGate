@@ -144,6 +144,15 @@ final _cases = <String, _Case>{
     ),
     'Locked until 10am',
   ),
+  'notifications off': _Case(
+    BlockerState(
+      accessibilityEnabled: true,
+      masterEnabled: true,
+      targets: [_youtube(enabled: true), _instagram(enabled: true)],
+      notificationsEnabled: false,
+    ),
+    'Protecting',
+  ),
 };
 
 final _baseDay = DateTime(2026, 10, 14);
@@ -289,6 +298,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('Start break'), findsNothing);
+  });
+
+  testWidgets('warns when notifications are disabled', (tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await _pump(tester, _cases['notifications off']!.state);
+
+    expect(find.text('Notifications are turned off'), findsOneWidget);
+    expect(find.text('Turn on notifications'), findsOneWidget);
   });
 
   testWidgets('bottom nav opens the how-it-works page', (tester) async {

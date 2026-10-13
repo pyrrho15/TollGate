@@ -8,6 +8,7 @@ import '../../data/models/block_target.dart';
 import 'home_controller.dart';
 import 'widgets/break_card.dart';
 import 'widgets/commitment_dialog.dart';
+import 'widgets/notification_card.dart';
 import 'widgets/permission_card.dart';
 import 'widgets/status_banner.dart';
 import 'widgets/target_tile.dart';
@@ -89,6 +90,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             onStartBreak: () => _startBreak(context, controller),
             onStopBreak: controller.reblockNow,
           ),
+          if (state.masterEnabled && !state.notificationsEnabled) ...[
+            const SizedBox(height: 12),
+            NotificationCard(onOpenSettings: controller.openNotificationSettings),
+          ],
         ],
         const SizedBox(height: 28),
         const SectionHeader(

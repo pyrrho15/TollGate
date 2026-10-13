@@ -19,6 +19,7 @@ class BlockerController(private val context: Context) {
     fun currentState(): Map<String, Any?> = mapOf(
         "accessibilityEnabled" to isAccessibilityEnabled(context),
         "masterEnabled" to BlockerPrefs.isMasterEnabled(context),
+        "notificationsEnabled" to notificationsEnabled(context),
         "targets" to SupportedTargets.all.map { target ->
             mapOf(
                 "id" to target.id,
@@ -143,6 +144,14 @@ class BlockerController(private val context: Context) {
     }
 
     private fun emitState() = BlockerEvents.emit(currentState())
+
+    /** Whether the user has allowed notifications (needed for the pinned reminder). */
+    private fun notificationsEnabled(context: Context): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.N) return true
+        val manager = context.getSystemService(android.app.NotificationManager::class.java)
+            ?: return false
+        return manager.areNotificationsEnabled()
+    }
 
     companion object {
         /** True only when the OS reports our accessibility service as enabled. */
