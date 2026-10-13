@@ -1,0 +1,135 @@
+# TollGate
+
+An Android-only app that blocks short-form feeds — **YouTube Shorts** and **Instagram
+Reels** — by bouncing you back out the instant you open them, while leaving the rest of
+those apps fully usable.
+
+## How it works
+
+Android sandboxes apps: no app can see inside another app. The **only** sanctioned way
+to observe another app's screen is the **AccessibilityService** API (the same API that
+powers screen readers like TalkBack). TollGate uses it exclusively:
+
+1. **Scoped by the OS.** `accessibility_service_config.xml` lists only
+   `com.google.android.youtube` and `com.instagram.android`. Android itself only
+   delivers screen events for those packages — TollGate physically cannot see your
+   bank app, messages, or keyboard.
+2. **Detect by layout, not content.** When the screen changes, the service walks the
+   view tree and looks for structural resource ids (`reel_recycler`,
+   `reel_player_page_container`, `clips_viewer_view_pager`, …). Resource ids are
+   language-independent; it never reads captions, messages, or video content.
+3. **Act.** On a match it calls `performGlobalAction(GLOBAL_ACTION_BACK)` — the same
+   thing as pressing the Back button — so you land back in the app's normal UI.
+4. **Stay alive.** A `specialUse` foreground service keeps the process out of Android's
+   frozen state, and a boot receiver re-arms it after a restart.
+
+**Privacy is structural:** the app declares **no `INTERNET` permission**. Android will
+not let it open a network connection, so there is nowhere for data to go. It is also
+open for you to read.
+
+## Architecture
+
+The blocker cannot be written in Dart — accessibility services are native Android
+components. So the split is:
+
+```
+Flutter (Dart)   →  UI, onboarding, settings state            [lib/]
+   │  MethodChannel / EventChannel
+Kotlin (native)  →  accessibility service, detection, action   [android/app/src/main/kotlin/]
+```
+
+- `lib/` — Flutter UI only. `data/services/blocker_platform_service.dart` is the single
+  place that touches platform channels.
+- `android/.../blocker/` — the engine:
+  - `ShortVideoBlockerService.kt` — the `AccessibilityService` (event plumbing, throttle, Back)
+  - `detection/ShortFeedDetector.kt` — pure matching rules, no Android UI dependency
+  - `TargetApp.kt` — the registry of supported feeds and their view-id markers
+  - `BlockerPrefs.kt` — one source of truth for settings (native owns SharedPreferences)
+  - `KeepAliveService.kt`, `BootReceiver.kt` — survive background freezing and reboot
+
+## Testing on your phone
+
+> **Toolchain already installed on this machine** (no sudo needed):
+> - Flutter 3.47.7 → `~/development/flutter`
+> - JDK 17 (Temurin) → `~/development/jdk-17`
+> - Android SDK → `~/Android/Sdk`
+>
+> `~/.bashrc` was updated, so a fresh terminal has `flutter`/`adb` on `PATH` and
+> `JAVA_HOME`/`ANDROID_HOME` set. If you're in a shell opened before this was added,
+> run `source ~/.bashrc` or open a new terminal.
+>
+> Build the installable APK with:
+> ```bash
+> cd ~/Desktop/vibecode/TollGate
+> flutter build apk --release
+> # → build/app/outputs/flutter-apk/app-release.apk
+> ```
+
+There is **no Expo Go for Flutter** (Flutter compiles to native code; there is no runtime
+shell to inject into). The normal workflow replaces it:
+
+### First time
+
+1. On the phone: **Settings → About phone → tap "Build number" 7 times** to unlock
+   Developer options.
+2. **Settings → Developer options → USB debugging → On.**
+3. Plug the phone into this computer and accept the "Allow USB debugging?" prompt.
+4. Verify: `flutter devices` shows your phone.
+
+### Daily development (hot reload)
+
+```bash
+flutter run            # pick your device if more than one
+```
+While running: press `r` to hot reload, `R` to hot restart, `q` to quit.
+
+> Hot reload only applies to Dart/UI. **Changes to the Kotlin blocker require a full
+> rebuild** — stop and `flutter run` again.
+
+### Wireless (Android 11+, no cable)
+
+```bash
+adb pair <ip>:<port>    # code shown in Developer options → Wireless debugging
+adb connect <ip>:<port>
+flutter run
+```
+
+### Build an installable APK (test the real thing)
+
+```bash
+flutter build apk --release
+# → build/app/outputs/flutter-apk/app-release.apk
+```
+Copy it to the phone and tap to install (allow "install unknown apps"), or
+`adb install -r build/app/outputs/flutter-apk/app-release.apk`.
+
+Test the blocker against a **release** build on a **physical device** — emulators and
+debug builds behave differently for background services.
+
+### On the phone, after installing
+
+> Android 13+ blocks enabling an accessibility service for a freshly sideloaded app.
+> If the toggle is greyed out: **Settings → Apps → TollGate → ⋮ → "Allow restricted
+> settings"**, then try again.
+
+1. Open TollGate → **Open accessibility settings** → enable **TollGate Short Block**.
+2. Back in the app, the status should say **Protecting** and the master switch turns on.
+3. Open YouTube → swipe into a Short → you should be bounced back. Normal videos still play.
+4. Same for Instagram → Reels tab.
+
+## Phase 1 scope
+
+- [x] Per-target block/unblock toggles (YouTube Shorts, Instagram Reels)
+- [x] Accessibility permission onboarding that reflects the *real* OS state
+- [x] Silent auto-back blocking with event throttling
+- [x] Settings persisted and re-armed after reboot
+- [ ] Phase 2 candidates: block counters/stats, "blocked" overlay with a breathing pause,
+      scheduled windows, TikTok/Facebook, quick-settings tile, battery-optimisation nudge
+
+## Known limitations
+
+Resource ids are internal to the target apps and **rotate between releases**. Detection
+is best-effort: if a target app ships a redesign, the marker lists in `TargetApp.kt`
+need updating. This is inherent to the approach — any app claiming otherwise is
+overselling.
+# TollGate
