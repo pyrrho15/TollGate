@@ -7,24 +7,18 @@ class AppStats {
     required this.today,
     required this.targets,
     required this.history,
-    this.calendar = const [],
-    this.trackedFrom,
     this.unblock = UnblockInfo.empty,
   });
 
   /// Local date these "today" figures belong to (yyyy-MM-dd).
   final String today;
 
+  /// Today's per-app figures.
   final List<TargetStat> targets;
 
-  /// Last seven days, oldest first (includes today).
+  /// Last seven days, oldest first (includes today). Each day carries its own
+  /// per-app split so any day can be shown as a donut.
   final List<DayStat> history;
-
-  /// ~17 weeks of daily totals, oldest first (includes today), for the heatmap.
-  final List<DayStat> calendar;
-
-  /// Earliest day with any recorded data; days before it are left neutral.
-  final String? trackedFrom;
 
   /// Today's break budget, so the Stats screen can show breaks taken.
   final UnblockInfo unblock;
@@ -41,17 +35,13 @@ class AppStats {
         history: (map['history'] as List)
             .map((e) => DayStat.fromMap(e as Map))
             .toList(growable: false),
-        calendar: ((map['calendar'] as List?) ?? const [])
-            .map((e) => DayStat.fromMap(e as Map))
-            .toList(growable: false),
-        trackedFrom: map['trackedFrom'] as String?,
         unblock: map['unblock'] == null
             ? UnblockInfo.empty
             : UnblockInfo.fromMap(map['unblock'] as Map),
       );
 }
 
-/// Today's figures for a single supported app.
+/// Figures for a single supported app on a single day.
 class TargetStat {
   const TargetStat({
     required this.id,
@@ -82,18 +72,36 @@ class DayStat {
     required this.date,
     required this.timeMs,
     required this.blocks,
+    this.targets = const [],
   });
 
   final String date;
   final int timeMs;
   final int blocks;
 
+  /// That day's per-app split, in the same order as [AppStats.targets].
+  final List<TargetStat> targets;
+
   /// `yyyy-MM-dd` parsed without pulling in intl.
   DateTime get dateTime => DateTime.parse(date);
+
+  /// e.g. `Monday`, `Tuesday` — derived from the date, locale-independent.
+  String get weekdayName => const [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday',
+      ][dateTime.weekday - 1];
 
   factory DayStat.fromMap(Map<dynamic, dynamic> map) => DayStat(
         date: map['date'] as String,
         timeMs: (map['timeMs'] as num).toInt(),
         blocks: (map['blocks'] as num).toInt(),
+        targets: ((map['targets'] as List?) ?? const [])
+            .map((e) => TargetStat.fromMap(e as Map))
+            .toList(growable: false),
       );
 }

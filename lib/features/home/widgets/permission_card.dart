@@ -88,7 +88,7 @@ class PermissionCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(
-                    'Scoped to YouTube and Instagram only.',
+                    'Scoped to the apps you enable.',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),

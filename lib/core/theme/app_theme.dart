@@ -19,6 +19,11 @@ class AppTheme {
   /// Convenience brand colors for the supported feeds.
   static const Color youtube = Color(0xFFFF0033);
   static const Color instagram = Color(0xFFE1306C);
+  static const Color facebook = Color(0xFF1877F2);
+
+  /// TikTok's own mark is black, which disappears on a dark surface; this teal reads
+  /// clearly on both light and dark backgrounds.
+  static const Color tiktok = Color(0xFF0097A7);
 
   static ThemeData get light => _build(Brightness.light);
   static ThemeData get dark => _build(Brightness.dark);

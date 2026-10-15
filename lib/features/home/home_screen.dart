@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../core/widgets/privacy_note.dart';
 import '../../core/widgets/section_header.dart';
 import '../../data/models/block_target.dart';
 import 'home_controller.dart';
@@ -10,11 +9,11 @@ import 'widgets/break_card.dart';
 import 'widgets/commitment_dialog.dart';
 import 'widgets/notification_card.dart';
 import 'widgets/permission_card.dart';
-import 'widgets/status_banner.dart';
 import 'widgets/target_tile.dart';
 
-/// The "Block" tab: the status summary and the controls that turn blocking
-/// on or off. Explanatory content lives on the how-it-works page instead.
+/// The "Block" tab: the controls that turn blocking on or off, plus the
+/// permission and notification prompts. Explanatory content lives on the
+/// how-it-works page instead.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -77,9 +76,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         40,
       ),
       children: [
-        StatusBanner(state: state),
         if (!hasPermission) ...[
-          const SizedBox(height: AppTheme.gutter),
           PermissionCard(onOpenSettings: controller.openAccessibilitySettings),
         ],
         if (hasPermission) ...[
@@ -111,8 +108,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ),
-        const SizedBox(height: 24),
-        const PrivacyNote(),
       ],
     );
   }

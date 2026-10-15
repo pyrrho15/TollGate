@@ -20,5 +20,13 @@ TargetLook targetLookFor(String id, ColorScheme scheme) => switch (id) {
           Icons.slow_motion_video_rounded,
           AppTheme.instagram,
         ),
+      'facebook_reels' => const TargetLook(
+          Icons.facebook_rounded,
+          AppTheme.facebook,
+        ),
+      'tiktok' => const TargetLook(
+          Icons.music_note_rounded,
+          AppTheme.tiktok,
+        ),
       _ => TargetLook(Icons.videocam_rounded, scheme.primary),
     };

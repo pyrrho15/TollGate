@@ -1,8 +1,9 @@
 # TollGate
 
-An Android-only app that blocks short-form feeds — **YouTube Shorts** and **Instagram
-Reels** — by bouncing you back out the instant you open them, while leaving the rest of
-those apps fully usable.
+An Android-only app that blocks short-form feeds — **YouTube Shorts**, **Instagram Reels**
+and **Facebook Reels** — by bouncing you back out the instant you open them, while leaving
+the rest of those apps fully usable. **TikTok** is short video from end to end, so opening
+it sends you straight back out.
 
 ## How it works
 
@@ -10,14 +11,16 @@ Android sandboxes apps: no app can see inside another app. The **only** sanction
 to observe another app's screen is the **AccessibilityService** API (the same API that
 powers screen readers like TalkBack). TollGate uses it exclusively:
 
-1. **Scoped by the OS.** `accessibility_service_config.xml` lists only
-   `com.google.android.youtube` and `com.instagram.android`. Android itself only
-   delivers screen events for those packages — TollGate physically cannot see your
-   bank app, messages, or keyboard.
-2. **Detect by layout, not content.** When the screen changes, the service walks the
-   view tree and looks for structural resource ids (`reel_recycler`,
-   `reel_player_page_container`, `clips_viewer_view_pager`, …). Resource ids are
-   language-independent; it never reads captions, messages, or video content.
+1. **Scoped by the OS.** `accessibility_service_config.xml` lists exactly the packages we
+   support — the apps above plus regional and TikTok-Lite variants. Android itself only
+   delivers screen events for those packages — TollGate physically cannot see your bank
+   app, messages, or keyboard.
+2. **Detect by layout, not content.** When the screen changes, the service walks the view
+   tree looking for structural resource ids (`reel_recycler`,
+   `reel_player_page_container`, `clips_viewer_view_pager`, `player_view`, …). Resource ids
+   are language-independent; it never reads captions, messages, or video content. Facebook
+   exposes almost no usable ids, so its Reels viewer is matched by a screen-fraction layout
+   signature instead (a full-screen scrollable video surface).
 3. **Act.** On a match it calls `performGlobalAction(GLOBAL_ACTION_BACK)` — the same
    thing as pressing the Back button — so you land back in the app's normal UI.
 4. **Stay alive.** A `specialUse` foreground service keeps the process out of Android's
@@ -43,7 +46,7 @@ Kotlin (native)  →  accessibility service, detection, action   [android/app/sr
 - `android/.../blocker/` — the engine:
   - `ShortVideoBlockerService.kt` — the `AccessibilityService` (event plumbing, throttle, Back)
   - `detection/ShortFeedDetector.kt` — pure matching rules, no Android UI dependency
-  - `TargetApp.kt` — the registry of supported feeds and their view-id markers
+  - `TargetApp.kt` — the registry of supported feeds and their detection rules
   - `stats/UsageStatsTracker.kt` — on-device screen-time/block counting (see Stats below)
   - `UnblockSchedule.kt` — the daily break budget and the 12am–10am hard schedule
   - `BlockerPrefs.kt` — one source of truth for settings (native owns SharedPreferences)
@@ -76,11 +79,9 @@ already receives:
 
 - A session starts when the app becomes active and ends when it leaves the foreground
   (confirmed by a 2-second poll of the focused window) or after a 15-second idle gap.
-- Totals are stored per day in SharedPreferences (kept for ~13 months).
-- A GitHub-style **consistency grid** turns a day green when that day's YouTube +
-  Instagram time stayed under the daily budget.
-- Because Android only hands us events for the two scoped packages, this is deliberately
-  an *estimate* of foreground time, not a forensic measurement. The UI says so.
+- Totals are stored per day **and per app** in SharedPreferences (kept for 30 days).
+- Because Android only hands us events for the scoped packages, this is deliberately an
+  *estimate* of foreground time, not a forensic measurement.
 
 This is why the accessibility config also sets `flagRetrieveInteractiveWindows` — it is
 only used to read the *package name* of the focused window.
@@ -90,20 +91,20 @@ only used to read the *package name* of the focused window.
 Three tabs, switched from a bottom navigation bar:
 
 **Block** (the controls)
-- **Status hero** — one of `Not set up yet`, `Paused`, `On a break`, `Locked until 10am`,
-  `Nothing selected`, or `Protecting`, always reflecting the real OS + settings state.
 - **Setup card** (only until permission is granted) — numbered steps, including the
   Android 13+ "Allow restricted settings" gotcha, and a button that opens the OS screen.
 - **Break card** — remaining break time for the day, plus the budgeted "Take a break"
   button (behind the commitment sentence) or "Block now" while a break is running.
+- **Notification card** — shown when notifications are off, since the pinned break
+  reminder cannot appear without them.
 - **Blocked feeds** — per-target switches with brand icons; turning one **off** needs the
   sentence and is blocked during the hard schedule.
-- A short privacy footer.
 
 **Stats** (what it counted)
-- Today's total time in YouTube + Instagram and how many scrolls were blocked.
-- Per-app breakdown (time, opens, blocked) and a summary of breaks taken today.
-- A seven-day bar chart and a GitHub-style consistency grid. All on-device.
+- A two-column summary grid: today's total screen time and the breaks taken so far.
+- A seven-day bar chart whose days are tappable.
+- A donut chart of the selected day by app (per-app time share and scrolls blocked). It
+  opens on today and follows whichever day you pick. All on-device.
 
 **How it works** (the explanation)
 - Why the accessibility layer is needed, the three-step explanation, what TollGate *can't*
@@ -111,9 +112,25 @@ Three tabs, switched from a bottom navigation bar:
 
 Styling lives in `lib/core/theme/app_theme.dart`; reusable widgets in
 `lib/core/widgets/`; each feature owns its own `features/<name>/` folder with a screen and
-its `widgets/`. Widgets read styling through `Theme.of(context)`. The launcher icon is an
-adaptive icon (a shield with a "back" arrow): see
-`android/app/src/main/res/mipmap-anydpi-v26/` and the `ic_launcher_*` drawables.
+its `widgets/`. Widgets read styling through `Theme.of(context)`.
+
+### Branding
+
+The launcher icon and launch screen come from the two source images kept in the repo root
+(`logo.png` and `splash-screen.png`), baked into density-specific resources so they stay
+sharp on every screen. `logo.png` is the artwork on white; `splash-screen.png` is the same
+artwork with a transparent background.
+
+| Where | Resources |
+| --- | --- |
+| Launcher icon, Android 8+ | `mipmap-anydpi-v26/ic_launcher*.xml` → `@color/ic_launcher_background` + `drawable-*/ic_launcher_foreground.png` (+ `ic_launcher_monochrome.png` for themed icons) |
+| Launcher icon, older | `mipmap-*/ic_launcher.png`, `mipmap-*/ic_launcher_round.png` |
+| Splash, Android 11 and below | `drawable*/launch_background.xml` — `@color/splash_background` with the centred `drawable-*/splash_logo.png` |
+| Splash, Android 12+ | `values-v31/styles.xml` / `values-night-v31/styles.xml` — `windowSplashScreenBackground` pinned to white |
+
+The artwork is dark navy, so the icon and splash both sit on white in **both** light and
+dark mode. The adaptive-icon foreground keeps the mark inside the 66dp safe zone, so no
+launcher mask can crop it.
 
 ### Running the UI tests
 
@@ -192,20 +209,21 @@ debug builds behave differently for background services.
 1. Open TollGate → **Open accessibility settings** → enable **TollGate Short Block**.
 2. Back in the app, the status should say **Protecting**; tap **Turn on protection**.
 3. Open YouTube → swipe into a Short → you should be bounced back. Normal videos still play.
-4. Same for Instagram → Reels tab.
+4. Same for Instagram → Reels tab, and Facebook → Reels tab. TikTok bounces you out on open.
 5. To take a break, tap **Take a break** and type the sentence. The pinned notification
    appears; it disappears when you re-block or the budget runs out.
 
 ## Phase 1 scope
 
-- [x] Per-target blocking (YouTube Shorts, Instagram Reels) with view-id detection
+- [x] Per-target blocking (YouTube Shorts, Instagram Reels, Facebook Reels, TikTok)
+- [x] Detection by view id, with a label/layout fallback for Facebook
 - [x] Accessibility permission onboarding that reflects the *real* OS state
 - [x] Silent auto-back blocking with event throttling
 - [x] Settings persisted and re-armed after reboot
 - [x] On-device stats: time in app, opens, and scrolls blocked (no extra permission)
 - [x] Commitment layer: daily break budget, typed phrase, hard schedule, pinned notice
-- [x] Consistency grid (GitHub-style) on the Stats tab
-- [ ] Phase 2 candidates: "blocked" overlay with a breathing pause, TikTok/Facebook,
+- [x] Per-day, per-app breakdown; any of the last seven days can be viewed
+- [ ] Phase 2 candidates: "blocked" overlay with a breathing pause, Snapchat/Reddit,
       quick-settings tile, battery-optimisation nudge, Device-Owner hardening
 
 ## Known limitations

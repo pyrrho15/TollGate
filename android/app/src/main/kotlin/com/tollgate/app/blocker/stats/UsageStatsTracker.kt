@@ -13,9 +13,9 @@ import java.util.Locale
  * Counts how long each supported app is in the foreground, and how many times we
  * blocked a Short/Reel, using only the accessibility events we already receive.
  *
- * No extra permission is needed: the service is scoped to YouTube and Instagram, so
- * the only thing this ever sees is those two packages. Totals are kept per day in
- * SharedPreferences and read back by the UI through the method channel.
+ * No extra permission is needed: the service is scoped to the apps the user enables, so
+ * the only thing this ever sees is those packages. Totals are kept per day *and per app*
+ * in SharedPreferences and read back by the UI through the method channel.
  *
  * Time is measured as a *session*: it starts when the app becomes active and ends
  * when it stops being active (confirmed by a 2-second poll of the active window) or
@@ -26,10 +26,9 @@ object UsageStatsTracker {
 
     private const val FILE = "tollgate_stats"
     private const val PREFIX = "v1"
-    private const val RETAIN_DAYS = 400
 
-    /** How many days the contribution graph asks for (17 weeks). */
-    private const val CALENDAR_DAYS = 119
+    /** How long a day's numbers are kept. The UI only ever asks for the last seven. */
+    private const val RETAIN_DAYS = 30
 
     /** How long a session survives without any signal that the app is still active. */
     private const val IDLE_TIMEOUT_MS = 15_000L
@@ -156,7 +155,10 @@ object UsageStatsTracker {
 
     // ----------------------------------------------------------------- reading
 
-    /** Snapshot of today's totals per target plus the last seven days. */
+    /**
+     * Today's totals per app, plus the last seven days — each carrying its own per-app
+     * split, so the Stats screen can show any of those days as a donut.
+     */
     fun snapshot(context: Context): Map<String, Any?> {
         val prefs = prefs(context)
         val today = today()
@@ -169,26 +171,32 @@ object UsageStatsTracker {
             liveMs = (lastSignalMs - sessionStartMs).coerceAtLeast(0L)
         }
 
-        val targets = SupportedTargets.all.map { target ->
-            var timeMs = prefs.getLong(key(today, target.id, METRIC_TIME), 0L)
-            if (target.id == liveTargetId) timeMs += liveMs
-            mapOf(
-                "id" to target.id,
-                "name" to target.displayName,
-                "timeMs" to timeMs,
-                "blocks" to prefs.getLong(key(today, target.id, METRIC_BLOCKS), 0L),
-                "opens" to prefs.getLong(key(today, target.id, METRIC_OPENS), 0L),
-            )
-        }
+        fun targetStats(date: String, extraLiveMs: Long): List<Map<String, Any?>> =
+            SupportedTargets.all.map { target ->
+                val live = if (date == today && target.id == liveTargetId) extraLiveMs else 0L
+                mapOf(
+                    "id" to target.id,
+                    "name" to target.displayName,
+                    "timeMs" to prefs.getLong(key(date, target.id, METRIC_TIME), 0L) + live,
+                    "blocks" to prefs.getLong(key(date, target.id, METRIC_BLOCKS), 0L),
+                    "opens" to prefs.getLong(key(date, target.id, METRIC_OPENS), 0L),
+                )
+            }
 
         fun dayTotal(date: String, extraLiveMs: Long): Map<String, Any?> {
+            val perTarget = targetStats(date, extraLiveMs)
             var timeMs = 0L
             var blocks = 0L
-            for (target in SupportedTargets.all) {
-                timeMs += prefs.getLong(key(date, target.id, METRIC_TIME), 0L)
-                blocks += prefs.getLong(key(date, target.id, METRIC_BLOCKS), 0L)
+            for (stat in perTarget) {
+                timeMs += stat["timeMs"] as Long
+                blocks += stat["blocks"] as Long
             }
-            return mapOf("date" to date, "timeMs" to timeMs + extraLiveMs, "blocks" to blocks)
+            return mapOf(
+                "date" to date,
+                "timeMs" to timeMs,
+                "blocks" to blocks,
+                "targets" to perTarget,
+            )
         }
 
         fun dateAt(offset: Int): String =
@@ -201,26 +209,10 @@ object UsageStatsTracker {
             dayTotal(date, if (date == today) liveMs else 0L)
         }
 
-        val calendar = (CALENDAR_DAYS downTo 0).map { offset ->
-            val date = dateAt(offset)
-            dayTotal(date, if (date == today) liveMs else 0L)
-        }
-
-        // The first day we ever recorded anything, so the graph can leave the days
-        // before TollGate existed neutral instead of falsely "green".
-        var trackedFrom = today
-        for (stored in prefs.all.keys) {
-            val parts = stored.split('|')
-            if (parts.size < 4 || parts[0] != PREFIX) continue
-            if (parts[1] < trackedFrom) trackedFrom = parts[1]
-        }
-
         return mapOf(
             "today" to today,
-            "targets" to targets,
+            "targets" to targetStats(today, liveMs),
             "history" to history,
-            "calendar" to calendar,
-            "trackedFrom" to trackedFrom,
         )
     }
 }

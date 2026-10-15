@@ -11,6 +11,7 @@ import 'package:tollgate/data/models/unblock_info.dart';
 import 'package:tollgate/data/services/blocker_platform_service.dart';
 import 'package:tollgate/features/home/home_controller.dart';
 import 'package:tollgate/features/stats/stats_controller.dart';
+import 'package:tollgate/features/stats/widgets/weekly_bars.dart';
 
 /// In-memory stand-in for the platform channel service so the UI can be
 /// exercised without an Android device.
@@ -87,10 +88,41 @@ BlockTarget _instagram({bool enabled = false}) => BlockTarget(
       enabled: enabled,
     );
 
+BlockTarget _facebook({bool enabled = false}) => BlockTarget(
+      id: 'facebook_reels',
+      name: 'Facebook Reels',
+      packageName: 'com.facebook.katana',
+      description:
+          'Blocks the full-screen Reels player. Feed, Groups, Marketplace and '
+          'Messenger keep working.',
+      enabled: enabled,
+    );
+
+BlockTarget _tiktok({bool enabled = false}) => BlockTarget(
+      id: 'tiktok',
+      name: 'TikTok',
+      packageName: 'com.zhiliaoapp.musically',
+      description:
+          'TikTok is short video start to finish, so opening it sends you '
+          'straight back out.',
+      enabled: enabled,
+    );
+
+List<BlockTarget> _allTargets({bool enabled = false}) => [
+      _youtube(enabled: enabled),
+      _instagram(enabled: enabled),
+      _facebook(enabled: enabled),
+      _tiktok(enabled: enabled),
+    ];
+
 class _Case {
-  const _Case(this.state, this.statusTitle);
+  const _Case(this.state, this.expectText);
+
   final BlockerState state;
-  final String statusTitle;
+
+  /// A string the Block page shows for this state, used to prove the state
+  /// rendered (the Block page no longer has a status heading).
+  final String expectText;
 }
 
 final _cases = <String, _Case>{
@@ -98,60 +130,60 @@ final _cases = <String, _Case>{
     BlockerState(
       accessibilityEnabled: false,
       masterEnabled: false,
-      targets: [_youtube(), _instagram()],
+      targets: _allTargets(),
     ),
-    'Not set up yet',
+    'Turn on the permission',
   ),
   'protecting': _Case(
     BlockerState(
       accessibilityEnabled: true,
       masterEnabled: true,
-      targets: [_youtube(enabled: true), _instagram(enabled: true)],
+      targets: _allTargets(enabled: true),
     ),
-    'Protecting',
+    'Take a break',
   ),
   'paused': _Case(
     BlockerState(
       accessibilityEnabled: true,
       masterEnabled: false,
-      targets: [_youtube(enabled: true), _instagram(enabled: true)],
+      targets: _allTargets(enabled: true),
     ),
-    'Paused',
+    'Turn protection on',
   ),
   'no feeds selected': _Case(
     BlockerState(
       accessibilityEnabled: true,
       masterEnabled: true,
-      targets: [_youtube(), _instagram()],
+      targets: _allTargets(),
     ),
-    'Nothing selected',
+    'Take a break',
   ),
   'on a break': _Case(
     BlockerState(
       accessibilityEnabled: true,
       masterEnabled: true,
-      targets: [_youtube(enabled: true), _instagram(enabled: true)],
+      targets: _allTargets(enabled: true),
       unblock: _breakActive,
     ),
-    'On a break',
+    'Break in progress',
   ),
   'hard locked': _Case(
     BlockerState(
       accessibilityEnabled: true,
       masterEnabled: true,
-      targets: [_youtube(enabled: true), _instagram(enabled: true)],
+      targets: _allTargets(enabled: true),
       unblock: _hardLocked,
     ),
-    'Locked until 10am',
+    'Locked until 10:00 AM',
   ),
   'notifications off': _Case(
     BlockerState(
       accessibilityEnabled: true,
       masterEnabled: true,
-      targets: [_youtube(enabled: true), _instagram(enabled: true)],
+      targets: _allTargets(enabled: true),
       notificationsEnabled: false,
     ),
-    'Protecting',
+    'Notifications are turned off',
   ),
 };
 
@@ -163,6 +195,9 @@ String _isoDate(int daysAgo) {
   final day = d.day.toString().padLeft(2, '0');
   return '${d.year}-$m-$day';
 }
+
+String _weekdayName(int daysAgo) =>
+    DayStat(date: _isoDate(daysAgo), timeMs: 0, blocks: 0).weekdayName;
 
 const _breakActive = UnblockInfo(
   budgetMs: 90 * 60 * 1000,
@@ -184,41 +219,50 @@ const _hardLocked = UnblockInfo(
   activeSince: 0,
 );
 
+/// That day's per-app split, in the same shape the native snapshot returns.
+List<TargetStat> _dayTargets(int daysAgo) => [
+      TargetStat(
+        id: 'youtube_shorts',
+        name: 'YouTube Shorts',
+        timeMs: (60 - daysAgo * 5) * 60 * 1000,
+        blocks: 25,
+        opens: 9,
+      ),
+      const TargetStat(
+        id: 'instagram_reels',
+        name: 'Instagram Reels',
+        timeMs: 18 * 60 * 1000,
+        blocks: 7,
+        opens: 4,
+      ),
+      const TargetStat(
+        id: 'facebook_reels',
+        name: 'Facebook Reels',
+        timeMs: 12 * 60 * 1000,
+        blocks: 3,
+        opens: 2,
+      ),
+      const TargetStat(
+        id: 'tiktok',
+        name: 'TikTok',
+        timeMs: 20 * 60 * 1000,
+        blocks: 5,
+        opens: 3,
+      ),
+    ];
+
 AppStats _sampleStats() => AppStats(
       today: _isoDate(0),
-      targets: const [
-        TargetStat(
-          id: 'youtube_shorts',
-          name: 'YouTube Shorts',
-          timeMs: 72 * 60 * 1000,
-          blocks: 25,
-          opens: 9,
-        ),
-        TargetStat(
-          id: 'instagram_reels',
-          name: 'Instagram Reels',
-          timeMs: 18 * 60 * 1000,
-          blocks: 7,
-          opens: 4,
-        ),
-      ],
+      targets: _dayTargets(0),
       history: [
         for (var i = 6; i >= 0; i--)
           DayStat(
             date: _isoDate(i),
-            timeMs: i * 5 * 60 * 1000,
+            timeMs: _dayTargets(i).fold(0, (sum, t) => sum + t.timeMs),
             blocks: i,
+            targets: _dayTargets(i),
           ),
       ],
-      calendar: [
-        for (var i = 20; i >= 0; i--)
-          DayStat(
-            date: _isoDate(i),
-            timeMs: (i % 4) * 40 * 60 * 1000,
-            blocks: i,
-          ),
-      ],
-      trackedFrom: _isoDate(20),
       unblock: _breakActive,
     );
 
@@ -254,7 +298,7 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('TollGate'), findsOneWidget);
-      expect(find.text(entry.value.statusTitle), findsOneWidget);
+      expect(find.text(entry.value.expectText), findsOneWidget);
 
       // Lower items sit below the fold on a small screen; scroll like a user
       // would and make sure everything renders without overflow.
@@ -266,13 +310,13 @@ void main() {
       expect(tester.takeException(), isNull);
 
       await tester.scrollUntilVisible(
-        find.text('Instagram Reels'),
+        find.text('TikTok'),
         200,
         scrollable: scrollable,
       );
       expect(tester.takeException(), isNull);
-      expect(find.text('YouTube Shorts'), findsOneWidget);
-      expect(find.text('Instagram Reels'), findsOneWidget);
+      expect(find.text('TikTok'), findsOneWidget);
+      expect(find.text('Facebook Reels'), findsOneWidget);
     });
   }
 
@@ -336,7 +380,7 @@ void main() {
     expect(find.text('Version ${AppConstants.appVersion}'), findsOneWidget);
   });
 
-  testWidgets('bottom nav opens the stats page', (tester) async {
+  testWidgets('stats page shows today, then a picked day', (tester) async {
     tester.view.physicalSize = const Size(360, 780);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -347,12 +391,31 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('TODAY'), findsOneWidget);
-    expect(find.text('YouTube Shorts'), findsOneWidget);
-    expect(find.text('Instagram Reels'), findsOneWidget);
-
-    await tester.scrollUntilVisible(find.text('Last 7 days'), 250);
-    expect(tester.takeException(), isNull);
+    // The consistency graph is gone and today's two numbers share one grid.
+    expect(find.text('Screen time'), findsOneWidget);
+    expect(find.text('Breaks today'), findsOneWidget);
     expect(find.text('Last 7 days'), findsOneWidget);
+    // Default view is today.
+    expect(find.text('Today by app'), findsOneWidget);
+
+    // Pick the oldest bar; the donut below should switch to that day.
+    final bars =
+        find.descendant(of: find.byType(WeeklyBars), matching: find.byType(InkWell));
+    await tester.tap(bars.first);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('${_weekdayName(6)} by app'), findsOneWidget);
+    expect(find.text('Today by app'), findsNothing);
+
+    // The per-app legend still lists every monitored app.
+    await tester.scrollUntilVisible(
+      find.text('TikTok'),
+      200,
+      scrollable: scrollable,
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.text('TikTok'), findsOneWidget);
+    expect(find.text('YouTube Shorts'), findsOneWidget);
   });
 }

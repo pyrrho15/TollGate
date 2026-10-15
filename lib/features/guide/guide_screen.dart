@@ -84,7 +84,7 @@ class _CantSeeCard extends StatelessWidget {
     'Your messages, email and calls',
     'Banking and payment apps',
     'Passwords and your keyboard',
-    'Anything outside YouTube and Instagram',
+    'Anything outside the apps you enable',
   ];
 
   @override
@@ -183,8 +183,8 @@ class _AboutCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'An Android-only app that silently sends you back when YouTube '
-              'Shorts or Instagram Reels open. No internet permission, no '
-              'accounts, no data collection.',
+              'Shorts, Instagram Reels, Facebook Reels or TikTok open. No '
+              'internet permission, no accounts, no data collection.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: scheme.onSurfaceVariant,
                 height: 1.4,

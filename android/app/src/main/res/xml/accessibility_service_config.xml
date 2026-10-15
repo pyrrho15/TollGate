@@ -7,4 +7,4 @@
     android:notificationTimeout="100"
     android:canRetrieveWindowContent="true"
     android:accessibilityFlags="flagReportViewIds|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
-    android:packageNames="com.google.android.youtube,com.instagram.android" />
+    android:packageNames="com.google.android.youtube,com.instagram.android,com.facebook.katana,com.zhiliaoapp.musically,com.zhiliaoapp.musically.go,com.ss.android.ugc.trill,com.ss.android.ugc.aweme" />

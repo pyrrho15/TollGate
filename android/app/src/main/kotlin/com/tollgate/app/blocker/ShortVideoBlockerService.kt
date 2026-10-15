@@ -110,7 +110,8 @@ class ShortVideoBlockerService : AccessibilityService() {
         if (now - lastBlockAt < BLOCK_COOLDOWN_MS) return
 
         val root = resolveRoot(event) ?: return
-        if (!ShortFeedDetector.isBlockedFeed(root, target)) return
+        val metrics = resources.displayMetrics
+        if (!ShortFeedDetector.isBlockedFeed(root, target, metrics.widthPixels, metrics.heightPixels)) return
 
         lastBlockAt = now
         performGlobalAction(GLOBAL_ACTION_BACK)
